@@ -15,15 +15,18 @@ from huggingface_hub import hf_hub_download
 # Initialize FastAPI app
 app = FastAPI()
 
+# Mount static files (CSS, JS)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Configure Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 
-# Define the Hugging Face repository and the specific GGUF filename
-repo_id = "unsloth/DeepSeek-V3-0324-GGUF"
-filename = "DeepSeek-V3-0324-Q2_K_XL.gguf"
+# --- Model download and setup ---
+# Define the Hugging Face repository and the specific GGUF filename for Llama 3
+repo_id = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
+filename = "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf"
 
-# This will be automatically cached, so it's only downloaded once.
+# Download the model file from the repository
 try:
     print(f"Downloading model from {repo_id}...")
     model_path = hf_hub_download(repo_id=repo_id, filename=filename)
@@ -32,8 +35,9 @@ except Exception as e:
     print(f"Error downloading model: {e}")
     model_path = None
 
-# A higher number uses more VRAM but is faster.
-n_gpu_layers = 40
+# Set the number of layers to offload to the GPU
+# Adjust based on your GPU VRAM
+n_gpu_layers = 40 
 
 # Create the Llama instance for the GGUF model
 try:
@@ -41,7 +45,7 @@ try:
         llm = Llama(
             model_path=model_path,
             n_gpu_layers=n_gpu_layers,
-            n_ctx=4096,
+            n_ctx=4096,  # Set the context size
             verbose=True
         )
     else:
@@ -57,15 +61,18 @@ class PromptRequest(BaseModel):
 # API endpoint for generating responses
 @app.post("/api/generate")
 def generate_response(request: PromptRequest):
-    """Generates a response from the GGUF model."""
+    """Generates a response from the Llama model."""
     if not llm:
         return {"error": "Model failed to load."}, 500
     
+    # Format the prompt for Llama 3 instruction models
+    formatted_prompt = f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n{request.prompt}<|eot|><|start_header_id|>assistant<|end_header_id|>\n"
+    
     # Perform inference
     output = llm(
-        request.prompt,
-        max_tokens=150,
-        stop=["<｜end of sentence｜>", "<|im_end|>"]
+        formatted_prompt,
+        max_tokens=256, # Increased max tokens for more complete answers
+        stop=["<|end_of_text|>", "<|eot|>"]
     )
     
     generated_text = output['choices'][0]['text']
