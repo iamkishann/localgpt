@@ -21,7 +21,7 @@ templates = Jinja2Templates(directory="templates")
 try:
     llm = Llama.from_pretrained(
         repo_id="QuantFactory/Meta-Llama-3-8B-Instruct-GGUF",
-        filename="Meta-Llama-3-8B-Instruct-Q8_0.gguf",
+        filename="Meta-Llama-3-8B-Instruct.Q8_0.gguf",
         n_gpu_layers=40,
         n_ctx=4096,  # Set the context size
         verbose=True
