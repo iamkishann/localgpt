@@ -16,34 +16,16 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Configure Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 
-# Define the Hugging Face repository and the specific GGUF filename for Llama 3
-repo_id = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
-filename = "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf"
-
-# Download the model file from the repository
+# Use Llama.from_pretrained() for simpler model loading
+# It automatically handles the download, and authentication
 try:
-    print(f"Downloading model from {repo_id}...")
-    model_path = hf_hub_download(repo_id=repo_id, filename=filename)
-    print(f"Model downloaded to: {model_path}")
-except Exception as e:
-    print(f"Error downloading model: {e}")
-    model_path = None
-
-# Set the number of layers to offload to the GPU
-# Adjust based on your GPU VRAM
-n_gpu_layers = 40 
-
-# Create the Llama instance for the GGUF model
-try:
-    if model_path:
-        llm = Llama(
-            model_path=model_path,
-            n_gpu_layers=n_gpu_layers,
-            n_ctx=4096,  # Set the context size
-            verbose=True
-        )
-    else:
-        llm = None
+    llm = Llama.from_pretrained(
+        repo_id="QuantFactory/Meta-Llama-3-8B-Instruct-GGUF",
+        filename="Meta-Llama-3-8B-Instruct-Q8_0.gguf",
+        n_gpu_layers=40,
+        n_ctx=4096,  # Set the context size
+        verbose=True
+    )
 except Exception as e:
     print(f"Error loading model: {e}")
     llm = None
