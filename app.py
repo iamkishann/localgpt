@@ -41,17 +41,16 @@ def generate_response(request: PromptRequest):
     if not llm:
         return {"error": "Model failed to load."}, 500
     
-    # Format the prompt for Llama 3 instruction models
-    formatted_prompt = f"<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n{request.prompt}<|eot|><|start_header_id|>assistant<|end_header_id|>\n"
-    
-    # Perform inference
-    output = llm(
-        formatted_prompt,
-        max_tokens=256, # Increased max tokens for more complete answers
+    # Use the create_chat_completion method
+    output = llm.create_chat_completion(
+        messages=[
+            {"role": "user", "content": request.prompt}
+        ],
+        max_tokens=256,
         stop=["<|end_of_text|>", "<|eot|>"]
     )
     
-    generated_text = output['choices'][0]['text']
+    generated_text = output['choices'][0]['message']['content']
     
     return {"response": generated_text}
 
