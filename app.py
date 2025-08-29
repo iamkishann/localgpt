@@ -4,11 +4,6 @@ from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
-# IMPORTANT: Ensure these libraries are installed
-# pip install llama-cpp-python[server]
-# pip install huggingface_hub
-
 from llama_cpp import Llama
 from huggingface_hub import hf_hub_download
 
@@ -21,7 +16,6 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Configure Jinja2 templates
 templates = Jinja2Templates(directory="templates")
 
-# --- Model download and setup ---
 # Define the Hugging Face repository and the specific GGUF filename for Llama 3
 repo_id = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
 filename = "Meta-Llama-3-8B-Instruct-Q4_K_M.gguf"
