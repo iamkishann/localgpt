@@ -1,22 +1,104 @@
+<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple Chatbot</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <title>FastMCP Chatbot</title>
+    <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="chat-container">
-        <div class="chat-header">Simple Chatbot</div>
-        <div class="chat-history" id="chat-history">
-            <!-- Chat messages will be added here by JavaScript -->
-        </div>
-        <div class="chat-input-form">
-            <input type="text" id="chat-input" placeholder="Type a message...">
-            <button id="send-button">Send</button>
-        </div>
+        <div id="chat-box" class="chat-box"></div>
+        <form id="chat-form">
+            <input type="text" id="prompt-input" placeholder="Type your message..." required>
+            <button type="submit">Send</button>
+        </form>
     </div>
-    <script src="/static/js/script.js"></script>
+    <script>
+        const chatForm = document.getElementById('chat-form');
+        const promptInput = document.getElementById('prompt-input');
+        const chatBox = document.getElementById('chat-box');
+        
+        let chatHistory = [];
+
+        const codeBlockRegex = /```([\s\S]*?)```/g;
+
+        chatForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const prompt = promptInput.value;
+            if (!prompt) return;
+
+            addMessage('user', prompt);
+            chatHistory.push({ "role": "user", "content": prompt });
+            promptInput.value = '';
+
+            const typingIndicator = addMessage('bot', '...', true);
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ prompt: prompt, chat_history: chatHistory }),
+                });
+
+                const data = await response.json();
+                typingIndicator.remove();
+                
+                const fullText = data.response;
+                const codeBlocks = fullText.match(codeBlockRegex);
+                const textParts = fullText.split(codeBlockRegex);
+                
+                let botResponseText = "";
+
+                textParts.forEach((part, index) => {
+                    if (part.trim()) {
+                        addMessage('bot', part);
+                        botResponseText += part;
+                    }
+                    if (codeBlocks && codeBlocks[index]) {
+                        const codeContent = codeBlocks[index].substring(3, codeBlocks[index].length - 3).trim();
+                        addCodeBlock(codeContent);
+                        botResponseText += `\n\`\`\`${codeContent}\`\`\`\n`;
+                    }
+                });
+                
+                chatHistory.push({ "role": "assistant", "content": botResponseText });
+
+            } catch (error) {
+                console.error('Error:', error);
+                typingIndicator.remove();
+                addMessage('bot', 'Error: Unable to get a response.');
+            }
+        });
+
+        function addMessage(sender, text, isTyping = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', `${sender}-message`);
+            if (isTyping) {
+                messageDiv.classList.add('typing-indicator');
+            }
+            messageDiv.textContent = text;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+            return messageDiv;
+        }
+
+        function addCodeBlock(code) {
+            const preElement = document.createElement('pre');
+            const codeElement = document.createElement('code');
+            codeElement.textContent = code;
+            preElement.appendChild(codeElement);
+
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message', 'bot-message', 'code-block');
+            messageDiv.appendChild(preElement);
+
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+    </script>
 </body>
 </html>
