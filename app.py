@@ -74,4 +74,4 @@ async def serve_webpage(request: Request):
 mcp = FastMCP.from_fastapi(app=app, name="llama-service")
 
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(host="0.0.0.0", port=8080)
