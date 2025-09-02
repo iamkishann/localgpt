@@ -74,7 +74,6 @@ async def serve_webpage(request: Request):
 mcp = FastMCP.from_fastapi(app=app, name="llama-service")
 
 if __name__ == "__main__":
-:    # Specify the transport type as "http"
     HOST = "0.0.0.0"
     PORT = 8000
     print(f"Starting server on http://{HOST}:{PORT}")
