@@ -70,6 +70,12 @@ async def generate_response(request_data: PromptRequest):
 async def serve_webpage(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
+from fastapi.responses import HTMLResponse
+
+@app.get("/test", response_class=HTMLResponse)
+async def test_route():
+    return "<h1>Server is running!</h1>"
+
 # Convert the existing FastAPI app into a FastMCP server
 mcp = FastMCP.from_fastapi(app=app, name="llama-service")
 
