@@ -1,3 +1,4 @@
+# app.py
 import torch
 import os
 from fastapi import FastAPI, Request
@@ -6,7 +7,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from llama_cpp import Llama
 from fastmcp import FastMCP
-from huggingface_hub import hf_hub_download, try_to_load_from_cache
+from huggingface_hub import try_to_load_from_cache
+from typing import List, Dict, Any
 
 # Initialize FastAPI app
 app = FastAPI()
@@ -24,67 +26,48 @@ FILENAME = "Meta-Llama-3-8B-Instruct.Q8_0.gguf"
 # Function to load the model
 def load_llm_model():
     """Checks for cached model and loads it, or downloads it if not found."""
-    llm_instance = None
     try:
-        # Check for the cached file path
-        model_path = try_to_load_from_cache(
-            repo_id=REPO_ID,
-            filename=FILENAME
-        )
-        
+        model_path = try_to_load_from_cache(repo_id=REPO_ID, filename=FILENAME)
         if model_path and os.path.exists(model_path):
             print(f"Loading model from cache: {model_path}")
-            llm_instance = Llama(
-                model_path=str(model_path),
-                n_gpu_layers=40,
-                n_ctx=4096,
-                verbose=True
-            )
+            return Llama(model_path=str(model_path), n_gpu_layers=40, n_ctx=4096, verbose=True)
         else:
             print("Model not found in cache. Downloading...")
-            # Fallback to from_pretrained which will download and cache
-            llm_instance = Llama.from_pretrained(
-                repo_id=REPO_ID,
-                filename=FILENAME,
-                n_gpu_layers=40,
-                n_ctx=4096,
-                verbose=True
-            )
+            return Llama.from_pretrained(repo_id=REPO_ID, filename=FILENAME, n_gpu_layers=40, n_ctx=4096, verbose=True)
     except Exception as e:
         print(f"Error loading model: {e}")
-        llm_instance = None
-    return llm_instance
+        return None
 
 # Load the model using the custom function
 llm = load_llm_model()
 
-# Pydantic model for the request body
+# Pydantic model for the request body, now including chat history
 class PromptRequest(BaseModel):
     prompt: str
+    chat_history: List[Dict[str, str]] = []
 
-# API endpoint
+# Define the LLM tool endpoint
 @app.post("/api/generate")
-def generate_response(request_data: PromptRequest):
-    """Generates a text completion from the Llama model based on a user prompt."""
+async def generate_response(request_data: PromptRequest):
+    """Generates a text completion from the Llama model, considering chat history."""
     if not llm:
         return {"error": "Model failed to load."}, 500
     
-    # Use the create_chat_completion method
+    # Construct the messages list for the LLM from the provided history and current prompt
+    messages = request_data.chat_history + [{"role": "user", "content": request_data.prompt}]
+    
+    # Use the create_chat_completion method with the full message history
     output = llm.create_chat_completion(
-        messages=[
-            {"role": "user", "content": request_data.prompt}
-        ],
-        max_tokens=512,
+        messages=messages,
+        max_tokens=256,
         stop=["<|end_of_text|>", "<|eot|>"]
     )
-    
     generated_text = output['choices']['message']['content']
-    
     return {"response": generated_text}
 
 # Endpoint to serve the main webpage
 @app.get("/")
-def serve_webpage(request: Request):
+async def serve_webpage(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 # Convert the existing FastAPI app into a FastMCP server
