@@ -1,4 +1,4 @@
-# app.py (MCP Server)
+# model_server.py
 import torch
 import os
 import signal
@@ -36,15 +36,11 @@ def load_llm_model():
 # Load the model using the custom function
 llm = load_llm_model()
 
-# Pydantic model for the request body
-class PromptRequest(BaseModel):
-    prompt: str
-    chat_history: List[Dict[str, str]] = []
-
 # Define the LLM tool endpoint
 @mcp.tool()
 async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []):
     """Generates a text completion from the Llama model, considering chat history."""
+    print("Inside generate_response tool!", flush=True)
     if not llm:
         return {"error": "Model failed to load."}, 500
     
@@ -67,9 +63,8 @@ async def mcp_messages_handler(request: Request) -> JSONResponse:
         tool_name = payload.get("method")
         params = payload.get("params", {})
         
-        # Dispatch the tool call using the MCP server's dispatch method
-        result = await mcp.dispatch_tool(tool_name, params)
-        print(tool_name)
+        # Dispatch the tool call, unpacking the parameters
+        result = await mcp.dispatch_tool(tool_name, **params)
         
         # Return the JSON-RPC compliant response
         response_payload = {
@@ -79,26 +74,11 @@ async def mcp_messages_handler(request: Request) -> JSONResponse:
         return JSONResponse(response_payload)
     except Exception as e:
         # Return an error in JSON-RPC format
+        print(f"Error in mcp_messages_handler: {e}", flush=True)
         return JSONResponse({"jsonrpc": "2.0", "error": {"message": str(e)}}, status_code=500)
 
-# Helper function to kill existing processes
-def kill_process_on_port(port: int):
-    """
-    Finds and kills any process using the specified port.
-    This function is cross-platform, using the psutil library.
-    """
-    try:
-        for proc in psutil.process_iter(['connections']):
-            for conn in proc.info['connections']:
-                if conn.laddr.port == port:
-                    print(f"Killing process {proc.pid} on port {port}")
-                    proc.send_signal(signal.SIGTERM)
-    except Exception as e:
-        print(f"Error while killing process on port {port}: {e}")
-
 if __name__ == "__main__":
-    HOST = "0.0.0.0"
+    HOST = "127.0.0.1"
     PORT = 8001
     print(f"Starting MCP Server on http://{HOST}:{PORT}")
-    kill_process_on_port(PORT)
     mcp.run(transport="http", host=HOST, port=PORT)
