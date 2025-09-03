@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FastMCP Chatbot</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="chat-container">
@@ -36,19 +36,31 @@
             const typingIndicator = addMessage('bot', '...', true);
 
             try {
-                // Now we are calling the MCP tool directly
-                const response = await fetch('/mcp/tool/generate_response', {
+                // Construct the JSON-RPC payload for the tool call
+                const payload = {
+                    jsonrpc: "2.0",
+                    method: "generate_response",
+                    params: {
+                        request_data: {
+                            prompt: prompt,
+                            chat_history: chatHistory
+                        }
+                    }
+                };
+                
+                const response = await fetch('/mcp/messages', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ request_data: { prompt: prompt, chat_history: chatHistory } }),
+                    body: JSON.stringify(payload),
                 });
 
                 const data = await response.json();
                 typingIndicator.remove();
                 
-                const fullText = data.response;
+                // Get the tool's result from the JSON-RPC response
+                const fullText = data.result.response;
                 const codeBlocks = fullText.match(codeBlockRegex);
                 const textParts = fullText.split(codeBlockRegex);
                 
