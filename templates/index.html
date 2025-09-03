@@ -36,31 +36,19 @@
             const typingIndicator = addMessage('bot', '...', true);
 
             try {
-                // Construct the JSON-RPC payload for the tool call
-                const payload = {
-                    jsonrpc: "2.0",
-                    method: "generate_response",
-                    params: {
-                        request_data: {
-                            prompt: prompt,
-                            chat_history: chatHistory
-                        }
-                    }
-                };
-                
-                const response = await fetch('/mcp/messages', {
+                // *** This is the corrected fetch URL ***
+                const response = await fetch('/api/generate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify({ prompt: prompt, chat_history: chatHistory }),
                 });
 
                 const data = await response.json();
                 typingIndicator.remove();
                 
-                // Get the tool's result from the JSON-RPC response
-                const fullText = data.result.response;
+                const fullText = data.response;
                 const codeBlocks = fullText.match(codeBlockRegex);
                 const textParts = fullText.split(codeBlockRegex);
                 
