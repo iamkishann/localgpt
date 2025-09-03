@@ -14,10 +14,10 @@ mcp = FastMCP("llama-service")
 
 # --- Resource definitions ---
 # Define a FileResource for the static files
-@mcp.resource("file://static/{path:str}")
-def serve_static_file(path: str) -> FileResource:
+@mcp.resource("file://static/css/style.css")
+def serve_static_file() -> FileResource:
     """Serves static files."""
-    return FileResource(path=f"static/{path}")
+    return FileResource(path=f"static/css/style.css")
 
 # Define a FileResource for the template file
 @mcp.resource("file://templates/index.html")
