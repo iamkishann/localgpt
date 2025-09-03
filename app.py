@@ -1,18 +1,29 @@
-# app.py
 import torch
 import os
 import signal
 import psutil
-from fastmcp import FastMCP, StaticFile
+from fastmcp import FastMCP
+from fastmcp.resources import FileResource
 from pydantic import BaseModel
 from llama_cpp import Llama
 from huggingface_hub import try_to_load_from_cache
 from typing import List, Dict, Any
 
-# Define the server and static/template resources
+# Define the server
 mcp = FastMCP("llama-service")
-mcp.add_resource(StaticFile("static"), name="static")
-mcp.add_resource(StaticFile("templates"), name="templates")
+
+# --- Resource definitions ---
+# Define a FileResource for the static files
+@mcp.resource("file://static/{path:str}")
+def serve_static_file(path: str) -> FileResource:
+    """Serves static files."""
+    return FileResource(path=f"static/{path}")
+
+# Define a FileResource for the template file
+@mcp.resource("file://templates/index.html")
+def serve_template_file() -> FileResource:
+    """Serves the main chat webpage."""
+    return FileResource(path="templates/index.html")
 
 # Model details
 REPO_ID = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
