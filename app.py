@@ -63,7 +63,21 @@ async def serve_webpage():
 
 # Helper function to kill existing processes
 def kill_process_on_port(port: int):
-    # ... (same kill_process_on_port function as before) ...
+    """
+    Finds and kills any process using the specified port.
+    This function is cross-platform, using the psutil library.
+    """
+    try:
+        for proc in psutil.process_iter(['connections']):
+            for conn in proc.info['connections']:
+                if conn.laddr.port == port:
+                    print(f"Killing process {proc.pid} on port {port}")
+                    # Sending a SIGTERM (graceful termination)
+                    proc.send_signal(signal.SIGTERM) 
+                    # If it doesn't terminate, you could use SIGKILL (forceful)
+                    # proc.send_signal(signal.SIGKILL)
+    except Exception as e:
+        print(f"Error while killing process on port {port}: {e}")
 
 if __name__ == "__main__":
     HOST = "0.0.0.0"
