@@ -51,7 +51,7 @@ async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []
         max_tokens=256,
         stop=["<|end_of_text|>", "<|eot|>"]
     )
-    generated_text = output['choices']['message']['content']
+    generated_text = output['choices'][0]['message']['content']
     return generated_text
 
 # --- CRUCIAL: Add the custom route to handle MCP messages ---
