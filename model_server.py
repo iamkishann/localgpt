@@ -54,29 +54,6 @@ async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []
     generated_text = output['choices'][0]['message']['content']
     return generated_text
 
-# --- CRUCIAL: Add the custom route to handle MCP messages ---
-@mcp.custom_route("/mcp/messages", methods=["POST"])
-async def mcp_messages_handler(request: Request) -> JSONResponse:
-    """Handles JSON-RPC requests for MCP tools."""
-    try:
-        payload = await request.json()
-        tool_name = payload.get("method")
-        params = payload.get("params", {})
-        
-        # Dispatch the tool call, unpacking the parameters
-        result = await mcp.dispatch_tool(tool_name, **params)
-        
-        # Return the JSON-RPC compliant response
-        response_payload = {
-            "jsonrpc": "2.0",
-            "result": result
-        }
-        return JSONResponse(response_payload)
-    except Exception as e:
-        # Return an error in JSON-RPC format
-        print(f"Error in mcp_messages_handler: {e}", flush=True)
-        return JSONResponse({"jsonrpc": "2.0", "error": {"message": str(e)}}, status_code=500)
-
 if __name__ == "__main__":
     HOST = "127.0.0.1"
     PORT = 8001
