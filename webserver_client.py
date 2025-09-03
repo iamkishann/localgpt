@@ -54,14 +54,23 @@ def generate_response_http():
         async def call_mcp():
             async with mcp_client:
                 result = await mcp_client.call_tool("generate_response", payload)
-                return result.text
+                
+                # Check if content exists and is a list
+                if result.content and isinstance(result.content, list):
+                    for content_block in result.content:
+                        if content_block.type == "text":
+                            return content_block.text
+                
+                # Fallback for when no text is found
+                app.logger.warning("MCP server response did not contain expected text content.")
+                return None
 
         generated_response = executor.submit(run_async_in_thread, call_mcp()).result()
 
         if generated_response:
             return jsonify({"response": generated_response})
         else:
-            return jsonify({"error": "Unexpected format in MCP server response"}), 500
+            return jsonify({"error": "Failed to get a valid response from the MCP server"}), 500
 
     except Exception as e:
         app.logger.error("Error in generate_response_http: %s", e)
