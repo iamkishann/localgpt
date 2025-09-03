@@ -8,7 +8,8 @@ from pydantic import BaseModel
 from llama_cpp import Llama
 from huggingface_hub import try_to_load_from_cache
 from typing import List, Dict, Any
-from fastapi.responses import HTMLResponse, FileResponse
+from starlette.responses import HTMLResponse, FileResponse
+from starlette.requests import Request
 from pathlib import Path
 
 # Define the server
@@ -42,14 +43,13 @@ class PromptRequest(BaseModel):
     chat_history: List[Dict[str, str]] = []
 
 # --- Standard HTTP Routes (for the web interface) ---
-# Serve the main chat webpage at the root URL
-@mcp.app.get("/", response_class=HTMLResponse)
-async def serve_webpage_http():
-    return Path("templates/index.html").read_text()
+@mcp.custom_route("/", methods=["GET"])
+async def serve_webpage_http(request: Request) -> HTMLResponse:
+    return HTMLResponse(Path("templates/index.html").read_text())
 
-# Serve static CSS files
-@mcp.app.get("/static/css/{filename:str}")
-async def serve_static_css(filename: str):
+@mcp.custom_route("/static/css/{filename}", methods=["GET"])
+async def serve_static_css(request: Request) -> FileResponse:
+    filename = request.path_params.get("filename")
     return FileResponse(f"static/css/{filename}")
 
 # Define the LLM tool endpoint
@@ -90,3 +90,4 @@ if __name__ == "__main__":
     print(f"Starting server on http://{HOST}:{PORT}")
     kill_process_on_port(PORT)
     mcp.run(transport="http", host=HOST, port=PORT)
+
