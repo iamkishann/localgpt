@@ -49,8 +49,8 @@ async def serve_webpage_http(request: Request) -> HTMLResponse:
 
 @mcp.custom_route("/static/css/{filename}", methods=["GET"])
 async def serve_static_css(request: Request) -> FileResponse:
-    filename = request.path_params.get("filename")
-    return FileResponse(f"static/css/{filename}")
+    filename = request.path_params["filename"]
+    return FileResponse(Path("static/css") / filename)
 
 # Define the LLM tool endpoint
 @mcp.tool()
