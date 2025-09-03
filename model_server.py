@@ -56,6 +56,28 @@ async def generate_response(request_data: PromptRequest):
     generated_text = output['choices']['message']['content']
     return {"response": generated_text}
 
+# --- CRUCIAL: Add the custom route to handle MCP messages ---
+@mcp.custom_route("/mcp/messages", methods=["POST"])
+async def mcp_messages_handler(request: Request) -> JSONResponse:
+    """Handles JSON-RPC requests for MCP tools."""
+    try:
+        payload = await request.json()
+        tool_name = payload.get("method")
+        params = payload.get("params", {})
+        
+        # Dispatch the tool call using the MCP server's dispatch method
+        result = await mcp.dispatch_tool(tool_name, params)
+        
+        # Return the JSON-RPC compliant response
+        response_payload = {
+            "jsonrpc": "2.0",
+            "result": result
+        }
+        return JSONResponse(response_payload)
+    except Exception as e:
+        # Return an error in JSON-RPC format
+        return JSONResponse({"jsonrpc": "2.0", "error": {"message": str(e)}}, status_code=500)
+
 # Helper function to kill existing processes
 def kill_process_on_port(port: int):
     """
