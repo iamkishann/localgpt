@@ -1,4 +1,4 @@
-# app.py
+# app.py (MCP Server)
 import torch
 import os
 import signal
@@ -8,9 +8,6 @@ from pydantic import BaseModel
 from llama_cpp import Llama
 from huggingface_hub import try_to_load_from_cache
 from typing import List, Dict, Any
-from starlette.responses import HTMLResponse, FileResponse
-from starlette.requests import Request
-from pathlib import Path
 
 # Define the server
 mcp = FastMCP("llama-service")
@@ -41,21 +38,6 @@ llm = load_llm_model()
 class PromptRequest(BaseModel):
     prompt: str
     chat_history: List[Dict[str, str]] = []
-
-# --- Standard HTTP Routes (for the web interface) ---
-@mcp.custom_route("/", methods=["GET"])
-async def serve_webpage_http(request: Request) -> HTMLResponse:
-    return HTMLResponse(Path("templates/index.html").read_text())
-
-# Serve all files within the static directory
-@mcp.custom_route("/static/{filepath:path}", methods=["GET"])
-async def serve_static_file(request: Request) -> FileResponse:
-    filepath = request.path_params.get("filepath")
-    file_path = Path("static") / filepath
-    print(filepath, file_path)
-    if not file_path.is_file():
-        return HTMLResponse(status_code=404)
-    return FileResponse(file_path)
 
 # Define the LLM tool endpoint
 @mcp.tool()
@@ -92,7 +74,6 @@ def kill_process_on_port(port: int):
 if __name__ == "__main__":
     HOST = "0.0.0.0"
     PORT = 8000
-    print(f"Starting server on http://{HOST}:{PORT}")
+    print(f"Starting MCP Server on http://{HOST}:{PORT}")
     kill_process_on_port(PORT)
     mcp.run(transport="http", host=HOST, port=PORT)
-
