@@ -48,7 +48,7 @@ async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []
     
     output = llm.create_chat_completion(
         messages=messages,
-        max_tokens=256,
+        max_tokens=512,
         stop=["<|end_of_text|>", "<|eot|>"]
     )
     generated_text = output['choices'][0]['message']['content']
