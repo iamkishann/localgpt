@@ -24,7 +24,6 @@ def serve_static_css(filename):
     """Serves static CSS files from the static/css directory."""
     return send_from_directory("static/css", filename)
 
-# A standard HTTP POST endpoint for the web page
 @app.route("/api/generate", methods=["POST"])
 def generate_response_http():
     """Receives a request from the web page and forwards it to the MCP server."""
@@ -52,14 +51,15 @@ def generate_response_http():
         result = mcp_response.get('result')
 
         if result:
-            # Safely get the value using .get() to prevent KeyError
             generated_response = result.get('response')
             if generated_response:
                 return jsonify({"response": generated_response})
             else:
                 return jsonify({"error": "Unexpected format in MCP server response"}), 500
         else:
-            return jsonify({"error": "Failed to get a valid result from the MCP server"}), 500
+            # If a JSON-RPC error occurred on the server
+            error_data = mcp_response.get('error', {})
+            return jsonify({"error": f"MCP server error: {error_data.get('message', 'Unknown error')}"}), 500
 
     except requests.exceptions.RequestException as e:
         return jsonify({"error": f"Failed to connect to MCP server: {str(e)}"}), 500
