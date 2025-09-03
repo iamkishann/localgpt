@@ -47,10 +47,15 @@ class PromptRequest(BaseModel):
 async def serve_webpage_http(request: Request) -> HTMLResponse:
     return HTMLResponse(Path("templates/index.html").read_text())
 
-@mcp.custom_route("/static/css/{filename}", methods=["GET"])
-async def serve_static_css(request: Request) -> FileResponse:
-    filename = request.path_params["filename"]
-    return FileResponse(Path("static/css") / filename)
+# Serve all files within the static directory
+@mcp.custom_route("/static/{filepath:path}", methods=["GET"])
+async def serve_static_file(request: Request) -> FileResponse:
+    filepath = request.path_params.get("filepath")
+    file_path = Path("static") / filepath
+    print(filepath, file_path)
+    if not file_path.is_file():
+        return HTMLResponse(status_code=404)
+    return FileResponse(file_path)
 
 # Define the LLM tool endpoint
 @mcp.tool()
