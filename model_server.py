@@ -43,12 +43,12 @@ class PromptRequest(BaseModel):
 
 # Define the LLM tool endpoint
 @mcp.tool()
-async def generate_response(request_data: PromptRequest):
+async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []):
     """Generates a text completion from the Llama model, considering chat history."""
     if not llm:
         return {"error": "Model failed to load."}, 500
     
-    messages = request_data.chat_history + [{"role": "user", "content": request_data.prompt}]
+    messages = chat_history + [{"role": "user", "content": prompt}]
     
     output = llm.create_chat_completion(
         messages=messages,
@@ -69,6 +69,7 @@ async def mcp_messages_handler(request: Request) -> JSONResponse:
         
         # Dispatch the tool call using the MCP server's dispatch method
         result = await mcp.dispatch_tool(tool_name, params)
+        print(tool_name)
         
         # Return the JSON-RPC compliant response
         response_payload = {
