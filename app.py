@@ -1,29 +1,18 @@
+# app.py
 import torch
 import os
 import signal
 import psutil
 from fastmcp import FastMCP
-from fastmcp.resources import FileResource
 from pydantic import BaseModel
 from llama_cpp import Llama
 from huggingface_hub import try_to_load_from_cache
 from typing import List, Dict, Any
+from fastapi.responses import HTMLResponse, FileResponse
+from pathlib import Path
 
 # Define the server
 mcp = FastMCP("llama-service")
-
-# --- Resource definitions ---
-# Define a FileResource for the static files
-@mcp.resource("file://static/css/style.css")
-def serve_static_file() -> FileResource:
-    """Serves static files."""
-    return FileResource(path=f"static/css/style.css")
-
-# Define a FileResource for the template file
-@mcp.resource("file://templates/index.html")
-def serve_template_file() -> FileResource:
-    """Serves the main chat webpage."""
-    return FileResource(path="templates/index.html")
 
 # Model details
 REPO_ID = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
@@ -44,10 +33,24 @@ def load_llm_model():
         print(f"Error loading model: {e}")
         return None
 
+# Load the model using the custom function
+llm = load_llm_model()
+
 # Pydantic model for the request body
 class PromptRequest(BaseModel):
     prompt: str
     chat_history: List[Dict[str, str]] = []
+
+# --- Standard HTTP Routes (for the web interface) ---
+# Serve the main chat webpage at the root URL
+@mcp.app.get("/", response_class=HTMLResponse)
+async def serve_webpage_http():
+    return Path("templates/index.html").read_text()
+
+# Serve static CSS files
+@mcp.app.get("/static/css/{filename:str}")
+async def serve_static_css(filename: str):
+    return FileResponse(f"static/css/{filename}")
 
 # Define the LLM tool endpoint
 @mcp.tool()
@@ -66,12 +69,6 @@ async def generate_response(request_data: PromptRequest):
     generated_text = output['choices']['message']['content']
     return {"response": generated_text}
 
-# Define the webpage endpoint
-@mcp.tool()
-async def serve_webpage():
-    """Serves the main chat webpage."""
-    return await mcp.resources.templates["index.html"]
-
 # Helper function to kill existing processes
 def kill_process_on_port(port: int):
     """
@@ -83,10 +80,7 @@ def kill_process_on_port(port: int):
             for conn in proc.info['connections']:
                 if conn.laddr.port == port:
                     print(f"Killing process {proc.pid} on port {port}")
-                    # Sending a SIGTERM (graceful termination)
-                    proc.send_signal(signal.SIGTERM) 
-                    # If it doesn't terminate, you could use SIGKILL (forceful)
-                    # proc.send_signal(signal.SIGKILL)
+                    proc.send_signal(signal.SIGTERM)
     except Exception as e:
         print(f"Error while killing process on port {port}: {e}")
 
