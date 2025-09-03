@@ -73,7 +73,7 @@ def kill_process_on_port(port: int):
 
 if __name__ == "__main__":
     HOST = "0.0.0.0"
-    PORT = 8000
+    PORT = 8001
     print(f"Starting MCP Server on http://{HOST}:{PORT}")
     kill_process_on_port(PORT)
     mcp.run(transport="http", host=HOST, port=PORT)
