@@ -1,61 +1,76 @@
-# model_server.py
-import torch
-import os
-import signal
-import psutil
+import subprocess
+import time
 from fastmcp import FastMCP
-from pydantic import BaseModel
-from llama_cpp import Llama
-from huggingface_hub import try_to_load_from_cache
 from typing import List, Dict, Any
-from starlette.requests import Request
-from starlette.responses import JSONResponse
+from openai import OpenAI
 
-# Define the server
-mcp = FastMCP("llama-service")
+# Define the server. FastMCP will listen on this port.
+mcp = FastMCP("openai-gpt-oss-120b-service")
 
-# Model details
-REPO_ID = "QuantFactory/Meta-Llama-3-8B-Instruct-GGUF"
-FILENAME = "Meta-Llama-3-8B-Instruct.Q8_0.gguf"
+# --- vLLM Server Configuration ---
+MODEL_ID = "openai/gpt-oss-120b"
+VLLM_HOST = "127.0.0.1"
+VLLM_PORT = 8002  # Use a different port for vLLM
+VLLM_URL = f"http://{VLLM_HOST}:{VLLM_PORT}/v1"
+vllm_process = None
 
-# Function to load the model
-def load_llm_model():
-    """Checks for cached model and loads it, or downloads it if not found."""
-    try:
-        model_path = try_to_load_from_cache(repo_id=REPO_ID, filename=FILENAME)
-        if model_path and os.path.exists(model_path):
-            print(f"Loading model from cache: {model_path}")
-            return Llama(model_path=str(model_path), n_gpu_layers=40, n_ctx=4096, verbose=True)
-        else:
-            print("Model not found in cache. Downloading...")
-            return Llama.from_pretrained(repo_id=REPO_ID, filename=FILENAME, n_gpu_layers=40, n_ctx=4096, verbose=True)
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        return None
+# OpenAI client setup to talk to the vLLM server
+openai_client = OpenAI(
+    api_key="sk-not-required",
+    base_url=VLLM_URL,
+)
 
-# Load the model using the custom function
-llm = load_llm_model()
+def start_vllm_server():
+    """Starts the vLLM server in a subprocess."""
+    global vllm_process
+    print(f"Starting vLLM server for model: {MODEL_ID} on {VLLM_URL}")
+    command = [
+        "vllm", "serve",
+        MODEL_ID,
+        "--host", VLLM_HOST,
+        "--port", str(VLLM_PORT),
+        "--served-model-name", MODEL_ID,
+        "--enable-chunked-output",
+        "--max-model-len", "128000"
+    ]
+    
+    # We detach the child process from the parent's terminal session
+    vllm_process = subprocess.Popen(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        start_new_session=True  # This detaches the process
+    )
 
-# Define the LLM tool endpoint
+    print("Waiting for vLLM server to start...")
+    time.sleep(30)
+    print("vLLM server started.")
+
 @mcp.tool()
 async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []):
-    """Generates a text completion from the Llama model, considering chat history."""
-    print("Inside generate_response tool!", flush=True)
-    if not llm:
-        return {"error": "Model failed to load."}, 500
-    
+    """Generates a text completion using the gpt-oss-120b model via the vLLM server."""
     messages = chat_history + [{"role": "user", "content": prompt}]
     
-    output = llm.create_chat_completion(
-        messages=messages,
-        max_tokens=512,
-        stop=["<|end_of_text|>", "<|eot|>"]
-    )
-    generated_text = output['choices'][0]['message']['content']
-    return generated_text
+    try:
+        response = openai_client.chat.completions.create(
+            model=MODEL_ID,
+            messages=messages,
+            max_tokens=512,
+            stop=["<|end_of_text|>", "<|eot|>"]
+        )
+        generated_text = response.choices.message.content
+        return generated_text
+    except Exception as e:
+        print(f"Error generating response from vLLM: {e}")
+        return {"error": "Failed to generate response."}, 500
 
 if __name__ == "__main__":
+    start_vllm_server()
+    
     HOST = "127.0.0.1"
     PORT = 8001
     print(f"Starting MCP Server on http://{HOST}:{PORT}")
-    mcp.run(transport="http", host=HOST, port=PORT)
+    try:
+        mcp.run(transport="http", host=HOST, port=PORT)
+    except Exception as e:
+        print(f"MCP Server shut down with an error: {e}")
