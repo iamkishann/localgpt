@@ -8,10 +8,10 @@ import sys
 from huggingface_hub import try_to_load_from_cache
 
 # Define the server. FastMCP will listen on this port.
-mcp = FastMCP("openai-gpt-oss-120b-service")
+mcp = FastMCP("openai-gpt-oss-20b-service")
 
 # --- vLLM Server Configuration ---
-MODEL_ID = "openai/gpt-oss-120b"
+MODEL_ID = "openai/gpt-oss-20b"
 VLLM_HOST = "127.0.0.1"
 VLLM_PORT = 8002  # Use a different port for vLLM
 VLLM_URL = f"http://{VLLM_HOST}:{VLLM_PORT}/v1"
@@ -75,7 +75,7 @@ def start_vllm_server():
 
 @mcp.tool()
 async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []):
-    """Generates a text completion using the gpt-oss-120b model via the vLLM server."""
+    """Generates a text completion using the gpt-oss-20b model via the vLLM server."""
     messages = chat_history + [{"role": "user", "content": prompt}]
     
     try:
