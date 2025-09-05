@@ -42,7 +42,6 @@ def start_vllm_server():
         "--host", VLLM_HOST,
         "--port", str(VLLM_PORT),
         "--served-model-name", MODEL_ID,
-        "--enable-chunked-output",
         "--max-model-len", "128000"
     ]
     
