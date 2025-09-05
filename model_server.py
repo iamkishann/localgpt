@@ -4,6 +4,8 @@ import sys
 from fastmcp import FastMCP
 from typing import List, Dict, Any
 from openai import OpenAI
+import sys
+from huggingface_hub import try_to_load_from_cache
 
 # Define the server. FastMCP will listen on this port.
 mcp = FastMCP("openai-gpt-oss-120b-service")
@@ -24,7 +26,16 @@ openai_client = OpenAI(
 def start_vllm_server():
     """Starts the vLLM server in a subprocess."""
     global vllm_process
+    # 1. Pre-check if the model is already in cache
+    #    This prevents unnecessary download attempts if network issues exist
     print(f"Starting vLLM server for model: {MODEL_ID} on {VLLM_URL}")
+    
+    model_cache_path = try_to_load_from_cache(repo_id=MODEL_ID)
+    if not model_cache_path:
+        print(f"Model {MODEL_ID} not found in cache. vLLM will attempt to download it.")
+    else:
+        print(f"Model {MODEL_ID} found in cache at: {model_cache_path}")
+        
     command = [
         "vllm", "serve",
         MODEL_ID,
