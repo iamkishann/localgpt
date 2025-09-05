@@ -30,7 +30,7 @@ def start_vllm_server():
     #    This prevents unnecessary download attempts if network issues exist
     print(f"Starting vLLM server for model: {MODEL_ID} on {VLLM_URL}")
     
-    model_cache_path = try_to_load_from_cache(repo_id=MODEL_ID)
+    model_cache_path = try_to_load_from_cache(repo_id=MODEL_ID, filename="config.json")
     if not model_cache_path:
         print(f"Model {MODEL_ID} not found in cache. vLLM will attempt to download it.")
     else:
