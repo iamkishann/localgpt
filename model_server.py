@@ -1,5 +1,6 @@
 import subprocess
 import time
+import sys
 from fastmcp import FastMCP
 from typing import List, Dict, Any
 from openai import OpenAI
@@ -38,13 +39,29 @@ def start_vllm_server():
     vllm_process = subprocess.Popen(
         command,
         stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        start_new_session=True  # This detaches the process
+        stderr=subprocess.STDOUT,  # Merge stdout and stderr for easier logging
+        start_new_session=True,  # This detaches the process
+        text=True, # Ensure output is treated as text
+        bufsize=1 # Line-buffered output
     )
 
-    print("Waiting for vLLM server to start...")
-    time.sleep(30)
-    print("vLLM server started.")
+    print("Waiting for vLLM server to start and model to download...")
+    
+    # Read the output line by line to monitor progress and prevent blocking
+    while True:
+        line = vllm_process.stdout.readline()
+        if line == '' and vllm_process.poll() is not None:
+            break
+        if line:
+            print(f"vLLM: {line.strip()}")
+            # Add a more robust readiness check (e.g., waiting for a specific log line)
+            if "Uvicorn running on" in line:
+                print("vLLM server confirmed running.")
+                break
+    
+    # Check if the process exited prematurely with an error
+    if vllm_process.returncode is not None:
+        raise RuntimeError(f"vLLM server exited unexpectedly with code {vllm_process.returncode}")
 
 @mcp.tool()
 async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []):
