@@ -91,6 +91,32 @@ async def generate_response(prompt: str, chat_history: List[Dict[str, str]] = []
         print(f"Error generating response from vLLM: {e}")
         return {"error": "Failed to generate response."}, 500
 
+@mcp.tool()
+async def review_code_with_llm(code_diff: str):
+    """Analyzes a code diff and provides review comments using the LLM."""
+    # Define the system prompt for code review
+    system_prompt = (
+        "You are an AI code reviewer. Analyze the following code changes and "
+        "provide suggestions, identify potential bugs, or offer improvements. "
+        "Address code style, best practices, and efficiency. Focus on the provided code diff."
+    )
+    
+    try:
+        response = openai_client.chat.completions.create(
+            model=MODEL_ID,
+            messages=[
+                {'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': f"Review the following code:\n\n{code_diff}"}
+            ],
+            max_tokens=512,
+            stop=["<|end_of_text|>", "<|eot|>"]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        print(f"Error generating code review from vLLM: {e}")
+        return f"Error: Failed to generate code review. {str(e)}"
+
+
 if __name__ == "__main__":
     start_vllm_server()
     
