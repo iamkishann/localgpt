@@ -6,6 +6,7 @@ from typing import List, Dict, Any
 from openai import OpenAI
 import sys
 from huggingface_hub import try_to_load_from_cache
+from flask import Flask, request, jsonify
 
 # Define the server. FastMCP will listen on this port.
 mcp = FastMCP("openai-gpt-oss-20b-service")
@@ -116,14 +117,31 @@ async def review_code_with_llm(code_diff: str):
         print(f"Error generating code review from vLLM: {e}")
         return f"Error: Failed to generate code review. {str(e)}"
 
+app = Flask(__name__)
+@app.route('/api/review-code', methods=['POST'])
+async def review_code_endpoint():
+    data = request.get_json()
+    code_diff = data.get('code_diff', '')
+    
+    if not code_diff:
+        return jsonify({'error': 'No code diff provided'}), 400
+
+    try:
+        # Call the dedicated mcp.tool() from the custom Flask endpoint
+        review_comment = await review_code_with_llm(code_diff)
+        return jsonify({'comment': review_comment})
+    except Exception as e:
+        print(f"Error calling review_code_with_llm: {e}")
+        return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == "__main__":
     start_vllm_server()
     
     HOST = "127.0.0.1"
     PORT = 8001
-    print(f"Starting MCP Server on http://{HOST}:{PORT}")
+    print(f"Starting MCP Server with custom routes on http://{HOST}:{PORT}")
     try:
+        mcp.add_api_routes(app)
         mcp.run(transport="http", host=HOST, port=PORT)
     except Exception as e:
         print(f"MCP Server shut down with an error: {e}")
