@@ -13,8 +13,14 @@ ollama_code_review:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event"
   
   script:
-    # --- Script to get the diff and post a comment ---
     - |
+      # Check if the variable is available
+      if [ -z "$GITLAB_API_TOKEN" ]; then
+        echo "GITLAB_API_TOKEN is not set or is empty."
+        exit 1
+      fi
+      echo "GITLAB_API_TOKEN is set $GITLAB_API_TOKEN. Continuing script..."
+      
       # 1. Determine the correct commit comparison for the diff.
       # When pushing, compare the current commit (HEAD) with the previous commit.
       # This provides the changes from the most recent commit.
@@ -44,29 +50,40 @@ ollama_code_review:
 
       # 2. Call your MCP server's API with the code diff.
       echo "Sending code diff to Ollama server for review..."
-      curl -v -X POST \
+      
+      JSON_PAYLOAD=$(jq -n \
+        --arg code_diff "$CODE_DIFF" \
+        '{jsonrpc: "2.0", id: "1", method: "tools/call", params: {name: "review_code_with_llm", arguments: {code_diff: $code_diff}}}')
+      
+      REVIEW_COMMENT=$(curl --fail --silent --show-error -X POST \
       -H "Content-Type: application/json" \
       -H "Accept: application/json, text/event-stream" \
-      -d '{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"review_code_with_llm","arguments":{"code_diff":"sample diff"}}}' \
-      $MCP_SERVER_ADDRESS/mcp
-
-      REVIEW_COMMENT=$(curl -v -X POST \
-      -H "Content-Type: application/json" \
-      -H "Accept: application/json, text/event-stream" \
-      -d "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"tools/call\",\"params\":{\"name\":\"review_code_with_llm\",\"arguments\":{\"code_diff\":\"$CODE_DIFF\"}}}" \
-      $MCP_SERVER_ADDRESS/mcp)
-
+      -d "$JSON_PAYLOAD" \
+      "$MCP_SERVER_ADDRESS/mcp" | jq -r '.result.structuredContent.comment')
 
       # Check if the Ollama response is empty
       if [ -z "$REVIEW_COMMENT" ]; then
-        echo "Ollama returned no comments."
-        exit 0
+          echo "Ollama returned no comments."
+          exit 0
+      else
+          # Print the review comment if it exists
+          echo "Ollama returned the following comments:"
+          echo "$REVIEW_COMMENT"
       fi
+
 
       # 3. Post the comment back to GitLab.
       echo "Posting Ollama's code review comment..."
+      
+      # Use jq to construct the JSON payload for the GitLab API call
+      # This handles multi-line content and JSON escaping safely.
+      NOTE_PAYLOAD=$(jq -n \
+        --arg comment "$REVIEW_COMMENT" \
+        '{note: ("**Ollama Code Review Suggestions:**\n\n" + $comment)}')
+      
+      echo $COMMENT_URL
       curl --request POST \
         --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" \
         --header "Content-Type: application/json" \
-        --data "{\"note\": \"**Ollama Code Review Suggestions:**\n\n$REVIEW_COMMENT\"}" \
+        --data "$NOTE_PAYLOAD" \
         "$COMMENT_URL"
