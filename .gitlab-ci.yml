@@ -1,0 +1,64 @@
+variables:
+  MCP_SERVER_ADDRESS: "http://127.0.0.1:8001"
+  
+stages:
+  - review
+
+ollama_code_review:
+  stage: review
+  image: curlimages/curl:latest # A lightweight image with curl and jq
+  rules:
+    # This rule triggers the job only when a new merge request is opened or updated.
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  
+  script:
+    # --- Script to get the diff and post a comment ---
+    - |
+      # 1. Determine the correct commit comparison for the diff.
+      # When pushing, compare the current commit (HEAD) with the previous commit.
+      # This provides the changes from the most recent commit.
+      # You can use a more advanced diff strategy if needed.
+      echo "Determining code diff..."
+      if [ "$CI_PIPELINE_SOURCE" == "push" ]; then
+        # For a single commit push, get diff between previous commit and current HEAD
+        CODE_DIFF=$(git diff $CI_COMMIT_BEFORE_SHA $CI_COMMIT_SHA)
+        
+        # When posting comments on commits, you need the correct URL.
+        COMMENT_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/repository/commits/$CI_COMMIT_SHA/comments"
+      elif [ "$CI_PIPELINE_SOURCE" == "merge_request_event" ]; then
+        # The merge request diff retrieval script from before is still valid.
+        DIFF=$(curl --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" \
+          "$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/diffs")
+        CODE_DIFF=$(echo $DIFF | jq -r '.[].diff')
+        
+        # Merge request comments are posted to a different endpoint.
+        COMMENT_URL="$CI_API_V4_URL/projects/$CI_PROJECT_ID/merge_requests/$CI_MERGE_REQUEST_IID/notes"
+      fi
+
+      # Check if diff is empty
+      if [ -z "$CODE_DIFF" ]; then
+        echo "No code changes found."
+        exit 0
+      fi
+
+      # 2. Call your MCP server's API with the code diff.
+      echo "Sending code diff to Ollama server for review..."
+      REVIEW_COMMENT=$(curl --fail --silent --show-error -X POST \
+        -H "Content-Type: application/json" \
+        -d "{\"code_diff\": \"$CODE_DIFF\"}" \
+        "$MCP_SERVER_ADDRESS/api/review-code" | jq -r '.comment')
+
+      # Check if the Ollama response is empty
+      if [ -z "$REVIEW_COMMENT" ]; then
+        echo "Ollama returned no comments."
+        exit 0
+      fi
+
+      # 3. Post the comment back to GitLab.
+      echo "Posting Ollama's code review comment..."
+      curl --request POST \
+        --header "PRIVATE-TOKEN: $GITLAB_API_TOKEN" \
+        --header "Content-Type: application/json" \
+        --data "{\"note\": \"**Ollama Code Review Suggestions:**\n\n$REVIEW_COMMENT\"}" \
+        "$COMMENT_URL"
