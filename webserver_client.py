@@ -26,8 +26,12 @@ async def call_mcp_tool(prompt: str, chat_history: List[Dict[str, str]]):
     async with mcp_client:
         payload = {"prompt": prompt, "chat_history": chat_history}
         result = await mcp_client.call_tool("generate_response", payload)
-        
-        return result.text
+        response_json = result.json()
+        gen_text = response_json.get("generated_test")
+        if not gen_test:
+            return "Model server returned no output"
+        return gen_text
+        #return result.text
 
 @app.route("/")
 def serve_webpage_http():
