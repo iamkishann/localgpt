@@ -1,33 +1,34 @@
-# webserver_client.py
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from flask import Flask, render_template, jsonify, request, send_from_directory
-from pathlib import Path
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from fastmcp import Client # Correct import for the client class
+from threading import Thread
 
-# Define the client service
-app = Flask(__name__, static_url_path='/static', static_folder='static', template_folder='templates')
-
-# --- Pydantic model for request validation ---
 class PromptRequest(BaseModel):
     prompt: str
     chat_history: List[Dict[str, str]] = []
 
-# Initialize MCP client
+# --- Standard HTTP Routes (for the web interface) ---
+app = Flask(__name__, static_url_path='/static', static_folder='static', template_folder='templates')
+
+asyncio_loop = asyncio.new_event_loop()
+asyncio_thread = Thread(target=asyncio_loop.run_forever, daemon=True)
+asyncio_thread.start()
+
+# Initialize MCP client once
 mcp_client = Client("http://localhost:8001/mcp")
 
-# Use a ThreadPoolExecutor to run async code from a sync context
-executor = ThreadPoolExecutor(max_workers=1)
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
+# Asynchronous function to call the MCP tool
+async def call_mcp_tool(prompt: str, chat_history: List[Dict[str, str]]):
+    async with mcp_client:
+        payload = {"prompt": prompt, "chat_history": chat_history}
+        result = await mcp_client.call_tool("generate_response", payload)
+        
+        return result.text
 
-def run_async_in_thread(coro):
-    return loop.run_until_complete(coro)
-
-# --- Standard HTTP Routes (for the web interface) ---
 @app.route("/")
 def serve_webpage_http():
     """Serves the main chat webpage."""
@@ -44,28 +45,14 @@ def generate_response_http():
     try:
         request_data = request.get_json()
         prompt_request = PromptRequest(**request_data)
-        
-        # --- Run the async MCP call in the executor thread ---
-        payload = {
-            "prompt": prompt_request.prompt,
-            "chat_history": prompt_request.chat_history
-        }
-        
-        async def call_mcp():
-            async with mcp_client:
-                result = await mcp_client.call_tool("generate_response", payload)
-                
-                # Check if content exists and is a list
-                if result.content and isinstance(result.content, list):
-                    for content_block in result.content:
-                        if content_block.type == "text":
-                            return content_block.text
-                
-                # Fallback for when no text is found
-                app.logger.warning("MCP server response did not contain expected text content.")
-                return None
 
-        generated_response = executor.submit(run_async_in_thread, call_mcp()).result()
+        # Submit the async function to our shared asyncio loop
+        future = asyncio.run_coroutine_threadsafe(
+            call_mcp_tool(prompt_request.prompt, prompt_request.chat_history),
+            asyncio_loop
+        )
+        
+        generated_response = future.result(timeout=60) # Add a timeout
 
         if generated_response:
             return jsonify({"response": generated_response})
