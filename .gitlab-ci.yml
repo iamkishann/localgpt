@@ -44,10 +44,11 @@ ollama_code_review:
 
       # 2. Call your MCP server's API with the code diff.
       echo "Sending code diff to Ollama server for review..."
-      REVIEW_COMMENT=$(curl --fail --silent --show-error -X POST \
-        -H "Content-Type: application/json" \
-        -d "{\"code_diff\": \"$CODE_DIFF\"}" \
-        "$MCP_SERVER_ADDRESS/api/review-code" | jq -r '.comment')
+      curl -X POST \
+      -H "Content-Type: application/json" \
+      -d "{\"tool\":\"review_code_with_llm\",\"params\":{\"code_diff\":\"$CODE_DIFF\"}}" \
+      $MCP_SERVER_ADDRESS/mcp
+
 
       # Check if the Ollama response is empty
       if [ -z "$REVIEW_COMMENT" ]; then
