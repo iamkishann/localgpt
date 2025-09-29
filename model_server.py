@@ -112,3 +112,16 @@ if __name__ == "__main__":
     # FastMCP now correctly introspects the FastAPI app to find both endpoints.
     mcp = FastMCP.from_fastapi(app=app, name="llama-service")
     mcp.run(transport="http", host=HOST, port=PORT)
+
+
+    import asyncio
+from fastmcp import Client
+
+async def test_mcp():
+    client = Client("http://127.0.0.1:8001/mcp")
+    async with client:
+        response = await client.call_tool("generate_response", {"prompt": "Hello", "chat_history": []})
+        print(response.json())
+
+asyncio.run(test_mcp())
+
