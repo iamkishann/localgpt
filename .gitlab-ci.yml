@@ -48,15 +48,13 @@ ollama_code_review:
       -H "Content-Type: application/json" \
       -H "Accept: application/json, text/event-stream" \
       -d '{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"review_code_with_llm","arguments":{"code_diff":"sample diff"}}}' \
-      http://127.0.0.1:8001/mcp
+      $MCP_SERVER_ADDRESS/mcp
 
-      
       REVIEW_COMMENT=$(curl -v -X POST \
       -H "Content-Type: application/json" \
       -H "Accept: application/json, text/event-stream" \
       -d "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"tools/call\",\"params\":{\"name\":\"review_code_with_llm\",\"arguments\":{\"code_diff\":\"$CODE_DIFF\"}}}" \
       $MCP_SERVER_ADDRESS/mcp)
-
 
 
       # Check if the Ollama response is empty
