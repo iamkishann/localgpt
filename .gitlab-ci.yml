@@ -44,10 +44,12 @@ ollama_code_review:
 
       # 2. Call your MCP server's API with the code diff.
       echo "Sending code diff to Ollama server for review..."
-      curl -X POST \
+      curl -v -X POST \
       -H "Content-Type: application/json" \
-      -d "{\"tool\":\"review_code_with_llm\",\"params\":{\"code_diff\":\"$CODE_DIFF\"}}" \
+      -H "Accept: application/json, text/event-stream" \
+      -d "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"tools/call\",\"params\":{\"name\":\"review_code_with_llm\",\"arguments\":{\"code_diff\":\"$CODE_DIFF\"}}}" \
       $MCP_SERVER_ADDRESS/mcp
+
 
 
       # Check if the Ollama response is empty
